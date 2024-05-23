@@ -24,7 +24,7 @@ const sites = ['URL_1', 'URL_2', 'URL_3'];
 npm run lighthouse
 ```
 
-All reports are save to the `reports` directory.
+All reports are saved as HTML pages to the `reports` directory.
 
 ## How to modify reports
 
