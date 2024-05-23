@@ -8,7 +8,6 @@ const getLighthouseReport = async (site) => {
   const options = {
     logLevel: 'info',
     output: 'html',
-    onlyCategories: ['performance'],
     port: chrome.port,
   };
 
