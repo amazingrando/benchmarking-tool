@@ -1,7 +1,7 @@
 import fs from 'fs';
 import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
-import sites from '../urlsToTest.js';
+import sites from '../urls.js';
 
 const getLighthouseReport = async (site) => {
   const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
@@ -20,16 +20,12 @@ const getLighthouseReport = async (site) => {
       .replace(/^https?:\/\//i, '')
       .replace('www.', '')
       .replace('.', '-')
-      .replace(/\/+/g, '-')}-lhreport.html`,
+      .replace(/\/+/g, '-')}-report.html`,
     reportHtml,
   );
 
   // `.lhr` is the Lighthouse Result as a JS object
   console.log('🎉 Report is done for', runnerResult.lhr.finalDisplayedUrl);
-  console.log(
-    'Performance score was',
-    runnerResult.lhr.categories.performance.score * 100,
-  );
 
   chrome.kill();
 };

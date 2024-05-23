@@ -34,7 +34,6 @@ Modify the options in `scripts/lighthouse.js`. See a list of options in the [Lig
 const options = {
   logLevel: 'info',
   output: 'html',
-  onlyCategories: ['performance'],
   port: chrome.port,
 };
 ```
