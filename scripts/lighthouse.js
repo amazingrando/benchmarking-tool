@@ -3,9 +3,8 @@ import lighthouse from 'lighthouse';
 import * as chromeLauncher from 'chrome-launcher';
 import sites from '../urlsToTest.js';
 
-const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
-
-sites.map(async (site) => {
+const getLighthouseReport = async (site) => {
+  const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
   const options = {
     logLevel: 'info',
     output: 'html',
@@ -21,7 +20,8 @@ sites.map(async (site) => {
     `reports/${site
       .replace(/^https?:\/\//i, '')
       .replace('www.', '')
-      .replace('.', '-')}-lhreport.html`,
+      .replace('.', '-')
+      .replace(/\/+/g, '-')}-lhreport.html`,
     reportHtml,
   );
 
@@ -33,4 +33,11 @@ sites.map(async (site) => {
   );
 
   chrome.kill();
-});
+};
+
+sites
+  .reduce(
+    (chain, item) => chain.then(() => getLighthouseReport(item)),
+    Promise.resolve(),
+  )
+  .then(() => console.log('All reports are finished.'));
