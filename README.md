@@ -12,7 +12,7 @@ npm install
 
 ### Set up array of URLs
 
-Edit `urlsToTest.js` and modify the sites value:
+Edit `urls.js` and modify the sites value:
 
 ``` js
 const sites = ['URL_1', 'URL_2', 'URL_3'];
