@@ -20,7 +20,7 @@ const getLighthouseReport = async (site) => {
       .replace(/^https?:\/\//i, '')
       .replace('www.', '')
       .replace('.', '-')
-      .replace(/\/+/g, '-')}-report.html`,
+      .replace(/\/+/g, '-')}-lighthouse-report.html`,
     reportHtml,
   );
 
@@ -35,4 +35,4 @@ sites
     (chain, item) => chain.then(() => getLighthouseReport(item)),
     Promise.resolve(),
   )
-  .then(() => console.log('All reports are finished.'));
+  .then(() => console.log('All lighthouse reports are finished.'));
