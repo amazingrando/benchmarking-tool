@@ -13,6 +13,8 @@ The purpose of this tool is to take an array of URLs and create a series of repo
 npm install
 ```
 
+You must have the [Google Chrome app](https://www.google.com/chrome/index.html) installed.
+
 ### Set up array of URLs
 
 Edit `urls.js` and modify the sites value:

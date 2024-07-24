@@ -7,7 +7,7 @@ const getLighthouseReport = async (site) => {
   const chrome = await chromeLauncher.launch({ chromeFlags: ['--headless'] });
   const options = {
     logLevel: 'info',
-    output: 'html',
+    output: 'csv',
     port: chrome.port,
   };
 
