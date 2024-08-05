@@ -7,7 +7,9 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lighthouse": "node scripts/lighthouse.js",
-    "pa11y": "node scripts/pa11y.js"
+    "pa11y": "node scripts/pa11y.js",
+    "screenshots": "node scripts/screenshots.js",
+    "everything": "npm run lighthouse & npm run pa11y & npm run screenshots"
   },
   "author": "",
   "license": "ISC",
@@ -16,7 +18,10 @@
     "chrome-launcher": "^1.1.1",
     "eslint-config-wesbos": "^4.0.1",
     "lighthouse": "^12.0.0",
-    "pa11y": "^8.0.0"
+    "pa11y": "^8.0.0",
+    "puppeteer": "^22.13.1",
+    "puppeteer-autoscroll-down": "^2.0.0",
+    "puppeteer-core": "^22.13.1"
   },
   "eslintConfig": {
     "extends": [
