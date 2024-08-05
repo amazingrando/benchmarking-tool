@@ -1,5 +1,7 @@
 reports/*
 !reports/.gitkeep
+screenshots/*
+!screenshots/.gitkeep
 
 node_modules/
 .DS_Store
