@@ -9,7 +9,8 @@
     "lighthouse": "node scripts/lighthouse.js",
     "pa11y": "node scripts/pa11y.js",
     "screenshots": "node scripts/screenshots.js",
-    "everything": "npm run lighthouse & npm run pa11y & npm run screenshots"
+    "everything": "npm run lighthouse & npm run pa11y & npm run screenshots",
+    "clean": "find reports screenshots -type f ! -name '.gitkeep' -delete"
   },
   "author": "",
   "license": "ISC",
