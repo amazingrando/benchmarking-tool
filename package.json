@@ -6,23 +6,22 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "lighthouse": "node scripts/lighthouse.js",
-    "pa11y": "node scripts/pa11y.js",
+    "audit": "node scripts/audit.js",
     "screenshots": "node scripts/screenshots.js",
-    "everything": "npm run lighthouse & npm run pa11y & npm run screenshots",
+    "everything": "npm run audit & npm run screenshots",
     "clean": "find reports screenshots -type f ! -name '.gitkeep' -delete"
   },
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "chrome-launcher": "^1.1.1",
-    "eslint-config-wesbos": "^4.0.1",
-    "lighthouse": "^12.0.0",
+    "chrome-launcher": "^1.1.2",
+    "eslint-config-wesbos": "^4.3.2",
+    "lighthouse": "^12.3.0",
     "pa11y": "^8.0.0",
-    "puppeteer": "^22.13.1",
+    "puppeteer": "^24.1.1",
     "puppeteer-autoscroll-down": "^2.0.0",
-    "puppeteer-core": "^22.13.1"
+    "puppeteer-core": "^24.1.1"
   },
   "eslintConfig": {
     "extends": [

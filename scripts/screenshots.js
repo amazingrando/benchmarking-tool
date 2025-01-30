@@ -1,95 +1,87 @@
 import puppeteer from 'puppeteer';
 import { scrollPageToBottom } from 'puppeteer-autoscroll-down';
-import sites from '../urls.js';
+import { sites, defaultViewports } from '../config.js';
 
-const screenshotLargeScreen = async (site, name) => {
+const takeScreenshot = async (page, site, name, viewport) => {
+  try {
+    await page.setViewport({
+      width: viewport.width,
+      height: 800,
+      deviceScaleFactor: 1,
+      isMobile: viewport.isMobile,
+    });
+
+    await page.goto(site, {
+      waitUntil: 'networkidle2',
+      timeout: 0,
+    });
+
+    // To get lazy loading images we start at the top...
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    // ...and then scroll to the bottom...
+    await scrollPageToBottom(page);
+
+    // Add delay to ensure lazy-loaded content is loaded
+    await new Promise((resolve) => {
+      setTimeout(resolve, 1000);
+    });
+
+    // ...and then scroll back to the top so fixed headers are at the top of the page.
+    await page.evaluate(() => window.scrollTo(0, 0));
+
+    const suffix = `${viewport.width}${viewport.isMobile ? '-mobile' : ''}`;
+    await page.screenshot({
+      path: `screenshots/screenshot-${name}--${suffix}-screen.png`,
+      fullPage: true,
+    });
+  } catch (error) {
+    console.error(
+      `Error taking ${viewport.width}px screenshot for ${site}:`,
+      error,
+    );
+  }
+};
+
+const screenshots = async (site, browser, config = {}) => {
+  try {
+    const name = site
+      .replace(/^https?:\/\//i, '')
+      .replace('www.', '')
+      .replace('.', '-')
+      .replace(/\/+/g, '-');
+
+    const page = await browser.newPage();
+
+    console.log(`Taking screenshots for ${site}...`);
+
+    // Use provided viewports or fall back to default configurations
+    const viewports = config.viewports || defaultViewports;
+
+    // Take screenshots for each viewport configuration
+    for (const viewport of viewports) {
+      await takeScreenshot(page, site, name, viewport);
+    }
+
+    await page.close();
+    console.log(`Completed screenshots for ${site}`);
+  } catch (error) {
+    console.error(`Error processing ${site}:`, error);
+  }
+};
+
+async function main() {
   const browser = await puppeteer.launch();
-  const page = await browser.newPage();
+  try {
+    for (const site of sites) {
+      await screenshots(site, browser);
+    }
+    console.log('All screenshots are finished.');
+  } catch (error) {
+    console.error('Fatal error:', error);
+  } finally {
+    await browser.close();
+  }
+}
 
-  await page.setViewport({
-    width: 1200,
-    height: 800,
-    deviceScaleFactor: 1,
-    isMobile: false,
-  });
-
-  await page.goto(site, {
-    waitUntil: 'networkidle2',
-    timeout: 0,
-  });
-
-  // To get lazy loading images we start at the top...
-  await page.evaluate((_) => {
-    window.scrollTo(0, 0);
-  });
-
-  // ...and then scroll to the bottom...
-  await scrollPageToBottom(page);
-
-  // ...and then scroll back to the top so fixed headers are at the top of the page.
-  await page.evaluate((_) => {
-    window.scrollTo(0, 0);
-  });
-
-  await page.screenshot({
-    path: `screenshots/screenshot-${name}--large-screen.png`,
-    fullPage: true,
-  });
-
-  await browser.close();
-};
-
-const screenshotSmallScreen = async (site, name) => {
-  const browser = await puppeteer.launch();
-  const page = await browser.newPage();
-
-  await page.setViewport({
-    width: 360,
-    height: 800,
-    deviceScaleFactor: 1,
-    isMobile: true,
-  });
-
-  await page.goto(site, {
-    waitUntil: 'networkidle2',
-    timeout: 0,
-  });
-
-  // To get lazy loading images we start at the top...
-  await page.evaluate((_) => {
-    window.scrollTo(0, 0);
-  });
-
-  // ...and then scroll to the bottom...
-  await scrollPageToBottom(page);
-
-  // ...and then scroll back to the top so fixed headers are at the top of the page.
-  await page.evaluate((_) => {
-    window.scrollTo(0, 0);
-  });
-
-  await page.screenshot({
-    path: `screenshots/screenshot-${name}--small-screen.png`,
-    fullPage: true,
-  });
-
-  await browser.close();
-};
-
-const screenshots = async (site) => {
-  const name = site
-    .replace(/^https?:\/\//i, '')
-    .replace('www.', '')
-    .replace('.', '-')
-    .replace(/\/+/g, '-');
-
-  screenshotLargeScreen(site, name);
-  screenshotSmallScreen(site, name);
-};
-
-sites
-  .reduce(
-    (chain, item) => chain.then(() => screenshots(item)),
-    Promise.resolve(),
-  )
-  .then(() => console.log('All screenshots are finished.'));
+main();

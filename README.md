@@ -2,9 +2,11 @@
 
 The purpose of this tool is to take an array of URLs and create a series of reports to benchmark stats prior to working on a project.
 
-* [Lighthouse](https://github.com/GoogleChrome/lighthouse/tree/main) reports as HTML files.
-* [Pa11y](https://github.com/pa11y/pa11y) reports as HTML files.
-* Take screenshots.
+We run the following as part of the audit:
+
+* [Lighthouse](https://github.com/GoogleChrome/lighthouse/tree/main)
+* [Pa11y](https://github.com/pa11y/pa11y)
+* Take full-page screenshots at desktop and mobile sizes.
 
 ## How to use
 
@@ -16,64 +18,64 @@ npm install
 
 You must have the [Google Chrome app](https://www.google.com/chrome/index.html) installed.
 
-### Set up array of URLs
+### Configuration
 
-Edit `urls.js` and modify the sites value:
+Edit `config.js` to modify the sites and viewport settings:
 
 ``` js
-const sites = ['URL_1', 'URL_2', 'URL_3'];
+export const sites = ['URL_1', 'URL_2', 'URL_3'];
+
+export const defaultViewports = [
+  { width: 1200, isMobile: false },
+  { width: 360, isMobile: true }
+];
 ```
+
+You can add as many viewport configurations as needed. Each viewport configuration requires:
+
+* `width`: The viewport width in pixels
+* `isMobile`: Boolean to indicate if it should use mobile device emulation
 
 ### Run reports and get screenshots
 
 Get everything with this command.
 
-``` node
+``` bash
 npm run everything
 ```
 
-Get only Lighthouse scores.
+Get only audits.
 
-``` node
-npm run lighthouse
-```
-
-Get only Pa11y reports.
-
-``` node
-npm run pa11y
+``` bash
+npm run audits
 ```
 
 Get only screenshots.
 
-``` node
+``` bash
 npm run screenshots
 ```
 
-All reports are saved as HTML pages to the `reports` directory.
+Remove old reports and screenshots
 
-All screenshots are saved in the `screenshots` directory.
-
-## How to modify reports
-
-### Lighthouse
-
-Modify the options in `scripts/lighthouse.js`. See a list of options in the [Lighthouse documentation](https://github.com/GoogleChrome/lighthouse/tree/main?tab=readme-ov-file#cli-options)
-
-``` js
-const options = {
-  logLevel: 'info',
-  output: 'html',
-  port: chrome.port,
-};
+``` bash
+npm run clean
 ```
 
-### Pa11y
+All reports are saved to the `reports` directory.
 
-This project doesn't have any options setup for Pa11y. You are welcome to edit the script for your own needs.
+All screenshots are saved in the `screenshots` directory as PNG files with the following naming convention:
 
-### Screenshots
+* Desktop: `screenshot-[domain-name]--[width]-screen.png`
+* Mobile: `screenshot-[domain-name]--[width]-mobile-screen.png`
 
-The sizes for the screenshots are hard coded in the `screenshotLargeScreen` and `screenshotSmallScreen` functions.
+## Screenshots
 
-A future update will make this configuration.
+The screenshots are taken at the viewport sizes specified in `config.js`. By default, these are:
+
+* Desktop: 1200px width
+* Mobile: 360px width
+
+Both screenshots are full-page captures that include all scrollable content. The script automatically scrolls the page to capture lazy-loaded content before taking the screenshot.
+
+To modify the viewport sizes or add additional breakpoints, edit the `defaultViewports` array in `config.js`.
