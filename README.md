@@ -8,6 +8,8 @@ We run the following as part of the audit:
 * [Pa11y](https://github.com/pa11y/pa11y)
 * Take full-page screenshots at desktop and mobile sizes.
 
+Reports are CSV files.
+
 ## How to use
 
 ### Installation
