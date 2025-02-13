@@ -108,6 +108,52 @@ All screenshots are saved in the `screenshots` directory as PNG files with the f
 * Desktop: `screenshot-[domain-name]--[width]-screen.png`
 * Mobile: `screenshot-[domain-name]--[width]-mobile-screen.png`
 
+## Reports
+
+### Lighthouse PDF Reports
+
+Lighthouse performance reports are generated as PDF files in the `reports/lighthouse-pdf` directory. Each report includes:
+
+* Overall performance scores for:
+  - Performance
+  - Accessibility
+  - Best Practices
+  - SEO
+
+* Detailed issue breakdown for each category:
+  - Lists all failed audits (scores below 100%)
+  - Shows the score for each issue
+  - Includes detailed descriptions of problems
+  - Provides recommendations for fixes
+
+* Core Web Vitals metrics:
+  - First Contentful Paint (FCP)
+  - Largest Contentful Paint (LCP)
+  - Total Blocking Time (TBT)
+  - Cumulative Layout Shift (CLS)
+  - Speed Index
+  - Time to Interactive
+
+Reports are named using the following convention:
+
+* `lighthouse-[hostname]-[pathname].pdf`
+* Example: `lighthouse-example.com-about.pdf` for https://example.com/about
+
+### Pa11y PDF Reports
+
+Pa11y accessibility reports are generated as PDF files in the `reports/pa11y-pdf` directory. Each report includes:
+
+* A summary of accessibility issues found (errors, warnings, and notices)
+* Detailed results for each issue, including:
+  - Issue message
+  - WCAG code reference
+  - HTML context
+  - DOM selector
+
+Reports are named using the following convention:
+* `pa11y-[hostname]-[pathname].pdf`
+* Example: `pa11y-example.com-about.pdf` for https://example.com/about
+
 ## Screenshots
 
 The screenshots are taken at the viewport sizes specified in `config.js`. By default, these are:
