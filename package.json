@@ -6,13 +6,15 @@
     "audit": "node scripts/audit.js",
     "clean": "find reports screenshots -type f ! -name '.gitkeep' -delete && find reports screenshots -type d -empty -delete",
     "config": "node scripts/generateConfig.js",
-    "filter": "node scripts/filterBySubdomains.js",
     "everything": "npm run audit & npm run screenshots",
+    "filter": "node scripts/filterBySubdomains.js",
+    "lighthouse:pdf": "node scripts/generateLighthousePDF.js",
     "lint:fix": "eslint . --fix",
     "lint": "eslint .",
+    "pa11y:pdf": "node scripts/generatePa11yPDF.js",
+    "reports": "npm run pa11y:pdf && npm run lighthouse:pdf",
     "screenshots": "node scripts/screenshots.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "pa11y:pdf": "node scripts/generatePa11yPDF.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
   "license": "ISC",
