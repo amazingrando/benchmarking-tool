@@ -4,13 +4,15 @@
   "main": "index.js",
   "scripts": {
     "audit": "node scripts/audit.js",
-    "clean": "find reports screenshots -type f ! -name '.gitkeep' -delete",
+    "clean": "find reports screenshots -type f ! -name '.gitkeep' -delete && find reports screenshots -type d -empty -delete",
     "config": "node scripts/generateConfig.js",
+    "filter": "node scripts/filterBySubdomains.js",
     "everything": "npm run audit & npm run screenshots",
     "lint:fix": "eslint . --fix",
     "lint": "eslint .",
     "screenshots": "node scripts/screenshots.js",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "pa11y:pdf": "node scripts/generatePa11yPDF.js"
   },
   "author": "",
   "license": "ISC",
@@ -22,6 +24,7 @@
     "eslint-config-wesbos": "^4.3.2",
     "lighthouse": "^12.3.0",
     "pa11y": "^8.0.0",
+    "pdfkit": "^0.16.0",
     "puppeteer": "^24.1.1",
     "puppeteer-autoscroll-down": "^2.0.0",
     "puppeteer-core": "^24.1.1"
