@@ -2,167 +2,134 @@
 
 # Benchmarking tool
 
-The purpose of this tool is to take an array of URLs and create a series of reports to benchmark stats prior to working on a project.
+The purpose of this tool is to take an array of URLs and create a report to benchmark a site before work starts.
 
-We run the following as part of the audit:
+One run does the following:
 
-* [Lighthouse](https://github.com/GoogleChrome/lighthouse/tree/main)
-* [Pa11y](https://github.com/pa11y/pa11y)
-* Take full-page screenshots at desktop and mobile sizes.
+* [Lighthouse](https://github.com/GoogleChrome/lighthouse/tree/main) in desktop Chrome: performance, accessibility, best practices, and SEO, plus lab Core Web Vitals.
+* [axe-core](https://github.com/dequelabs/axe-core) WCAG 2.2 AA and [HTML_CodeSniffer](https://github.com/squizlabs/HTML_CodeSniffer) WCAG 2.0 AA in Chromium, Firefox, and WebKit.
+* Heading outline, landmarks, a keyboard tab pass, a 320px reflow check, and a reduced-motion check in each of those browsers.
+* Full-page screenshots at the configured viewport widths in each browser.
 
-Reports are CSV files.
+The run always finishes and writes a report. Findings do not fail the process. Lighthouse numbers are lab results. Total Blocking Time is the lab stand-in for Interaction to Next Paint, not field data.
 
 ## How to use
 
 ### Installation
 
-``` bash
+```bash
 npm install
+npx playwright install chromium firefox webkit
 ```
 
-You must have the [Google Chrome app](https://www.google.com/chrome/index.html) installed.
+You must have the [Google Chrome app](https://www.google.com/chrome/index.html) installed. Lighthouse launches that Chrome. Playwright uses its own Chromium, Firefox, and WebKit for the accessibility checks and screenshots.
 
 ### Configuration
 
-You can either manually edit `config.js` or generate it from a CSV file of URLs.
+Edit `config.js` or generate it from a CSV file of URLs.
 
-#### Manual Configuration
+#### Manual configuration
 
-Edit `config.js` to modify the sites and viewport settings:
-
-``` js
+```js
 export const sites = ['URL_1', 'URL_2', 'URL_3'];
 
 export const defaultViewports = [
   { width: 1200, isMobile: false },
-  { width: 360, isMobile: true }
+  { width: 360, isMobile: true },
 ];
+
+// Optional. Defaults to Chromium, Firefox, and WebKit.
+export const browsers = ['chromium', 'firefox', 'webkit'];
 ```
+
+Each viewport needs:
+
+* `width`: viewport width in pixels
+* `isMobile`: `true` uses a mobile device context for that screenshot
+
+Pages are loaded as they are. The run does not log in and does not dismiss cookie banners.
 
 #### Generate from a Google Analytics CSV export
 
-You can generate the config file from a Google Analytics CSV file containing URLs and their view counts. The script will take the top N most viewed URLs.
+The generator takes the top N most viewed URLs from a CSV export.
 
-1. Prepare a CSV file (default name: `download.csv`) with columns for URLs and views. The column headers should contain either:
+1. Prepare a CSV file (default name: `download.csv`) with columns for URLs and views. Headers should contain either:
    - URLs: "location", "url", or "path"
-   - Views: "views" (excluding columns with "per" in the name)
+   - Views: "views" (columns with "per" in the name are ignored)
 
-2. Run the generation script:
-
-```bash
-node scripts/generateSitesConfig.js [input.csv] [output.js]
-```
-
-Or
+2. Run:
 
 ```bash
 npm run config
 ```
 
-The script will:
+Or pass paths:
 
-- Prompt you for how many top URLs you want to include
-- Generate a config file with the most viewed URLs
-- Use default viewport settings
+```bash
+node scripts/generateConfig.js [input.csv] [output.js]
+```
 
-Arguments are optional:
+The script prompts for how many top URLs to include. The input defaults to `download.csv` and the output defaults to `config.js`.
 
-- Input file defaults to `download.csv`
-- Output file defaults to `config.js`
+### Run
 
-### Viewport configuration
+Run Lighthouse, the cross-browser checks, screenshots, and the HTML report:
 
-You can add as many viewport configurations as needed. Each viewport configuration requires:
-
-* `width`: The viewport width in pixels
-* `isMobile`: Boolean to indicate if it should use mobile device emulation
-
-### Run reports and get screenshots
-
-Get everything with this command.
-
-``` bash
+```bash
 npm run everything
 ```
 
-Get only audits.
+`npm run audit` is the same command.
 
-``` bash
-npm run audits
-```
+Screenshots only, still in all configured browsers:
 
-Get only screenshots.
-
-``` bash
+```bash
 npm run screenshots
 ```
 
-Remove old reports and screenshots
+Rebuild `report.html` from the newest JSON without launching browsers:
 
-``` bash
+```bash
+npm run report
+```
+
+Remove old reports:
+
+```bash
 npm run clean
 ```
 
-All reports are saved to the `reports` directory.
+## Output
 
-All screenshots are saved in the `screenshots` directory as PNG files with the following naming convention:
+Each run writes a folder:
 
-* Desktop: `screenshot-[domain-name]--[width]-screen.png`
-* Mobile: `screenshot-[domain-name]--[width]-mobile-screen.png`
+```text
+reports/2026-10-09T18-11-00-000Z/
+  lighthouse.json
+  a11y.json
+  report.html
+  screenshots/{chromium,firefox,webkit}/...
+```
 
-## Reports
+Open `report.html` in a browser. It links to the screenshots with relative paths.
 
-### Lighthouse PDF Reports
+Screenshot files live under `screenshots/{browser}/`:
 
-Lighthouse performance reports are generated as PDF files in the `reports/lighthouse-pdf` directory. Each report includes:
+* Desktop: `{slug}--{width}.png`
+* Mobile: `{slug}--{width}-mobile.png`
+* Reflow evidence, only when a page overflows at 320 CSS pixels: `{slug}--320-reflow.png`
 
-* Overall performance scores for:
-  - Performance
-  - Accessibility
-  - Best Practices
-  - SEO
+`lighthouse.json` holds the desktop Chrome scores and lab metrics: First Contentful Paint, Largest Contentful Paint, Total Blocking Time, Cumulative Layout Shift, Speed Index, and Time to Interactive.
 
-* Detailed issue breakdown for each category:
-  - Lists all failed audits (scores below 100%)
-  - Shows the score for each issue
-  - Includes detailed descriptions of problems
-  - Provides recommendations for fixes
+`a11y.json` holds, per URL and browser:
 
-* Core Web Vitals metrics:
-  - First Contentful Paint (FCP)
-  - Largest Contentful Paint (LCP)
-  - Total Blocking Time (TBT)
-  - Cumulative Layout Shift (CLS)
-  - Speed Index
-  - Time to Interactive
+* axe-core violations for the tags `wcag2a`, `wcag2aa`, `wcag21a`, `wcag21aa`, and `wcag22aa`
+* HTML_CodeSniffer `WCAG2AA` messages, tagged as a second opinion (that standard does not cover every WCAG 2.2 criterion)
+* Heading and landmark lists
+* Keyboard sequence and notes (possible focus traps, focus that leaves the page, and focused elements with no outline, box-shadow, or offset)
+* Reflow at 320 CSS pixels, the usual stand-in for 1280px at 400% zoom
+* Animations still running after `prefers-reduced-motion: reduce`
 
-Reports are named using the following convention:
+Keyboard, reflow, and reduced-motion notes are heuristics. They are stored apart from the engine issues and are not WCAG verdicts.
 
-* `lighthouse-[hostname]-[pathname].pdf`
-* Example: `lighthouse-example.com-about.pdf` for https://example.com/about
-
-### Pa11y PDF Reports
-
-Pa11y accessibility reports are generated as PDF files in the `reports/pa11y-pdf` directory. Each report includes:
-
-* A summary of accessibility issues found (errors, warnings, and notices)
-* Detailed results for each issue, including:
-  - Issue message
-  - WCAG code reference
-  - HTML context
-  - DOM selector
-
-Reports are named using the following convention:
-* `pa11y-[hostname]-[pathname].pdf`
-* Example: `pa11y-example.com-about.pdf` for https://example.com/about
-
-## Screenshots
-
-The screenshots are taken at the viewport sizes specified in `config.js`. By default, these are:
-
-* Desktop: 1200px width
-* Mobile: 360px width
-
-Both screenshots are full-page captures that include all scrollable content. The script automatically scrolls the page to capture lazy-loaded content before taking the screenshot.
-
-To modify the viewport sizes or add additional breakpoints, edit the `defaultViewports` array in `config.js`.
+A navigation timeout is 60 seconds. A timeout or crash is recorded in the report and the run continues with the next URL or browser.
