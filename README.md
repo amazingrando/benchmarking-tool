@@ -2,7 +2,7 @@
 
 # Benchmarking tool
 
-The purpose of this tool is to take an array of URLs and create a report to benchmark a site before work starts.
+The purpose of this tool is to take an array of URLs and create a report to benchmark a site.
 
 One run does the following:
 
