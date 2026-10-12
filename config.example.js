@@ -7,3 +7,6 @@ export const defaultViewports = [
 
 // Optional. Defaults to Chromium, Firefox, and WebKit.
 export const browsers = ['chromium', 'firefox', 'webkit'];
+
+// Optional. How many times to run Lighthouse for each URL. Defaults to 6.
+export const lighthouseRuns = 6;

@@ -24,6 +24,13 @@ export const AXE_TAGS = [
 export const NAV_TIMEOUT_MS = 60000;
 export const TAB_LIMIT = 50;
 export const NOTE_CAP = 25;
+export const DEFAULT_LIGHTHOUSE_RUNS = 6;
+
+const lighthouseRunCount = (value) => {
+  const count = Number(value);
+  if (Number.isInteger(count) && count >= 1) return count;
+  return DEFAULT_LIGHTHOUSE_RUNS;
+};
 
 export const loadSettings = () => {
   const browsers =
@@ -38,5 +45,6 @@ export const loadSettings = () => {
       { width: 360, isMobile: true },
     ],
     browsers,
+    lighthouseRuns: lighthouseRunCount(config.lighthouseRuns),
   };
 };

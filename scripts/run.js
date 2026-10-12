@@ -5,7 +5,7 @@ import path from 'path';
 import { chromium, firefox, webkit } from 'playwright';
 import { auditUrl } from './lib/browserPass.js';
 import { slugFromUrl } from './lib/filename.js';
-import { runLighthouseAudit } from './lib/lighthouse.js';
+import { runLighthouseAudits } from './lib/lighthouse.js';
 import { renderReport } from './lib/reportHtml.js';
 import { createRunDir, latestRunDir } from './lib/runDir.js';
 import { loadSettings } from './lib/settings.js';
@@ -104,19 +104,27 @@ const main = async () => {
 
   const runDir = createRunDir();
   const generatedAt = new Date().toISOString();
-  const lighthouse = { generatedAt, results: [] };
+  const lighthouse = {
+    generatedAt,
+    runs: settings.lighthouseRuns,
+    results: [],
+  };
 
   if (!screenshotsOnly) {
     for (const url of settings.sites) {
-      console.log(`Lighthouse: ${url}`);
+      console.log(
+        `Lighthouse: ${url} (${settings.lighthouseRuns} ${settings.lighthouseRuns === 1 ? 'run' : 'runs'})`,
+      );
       // Lighthouse uses one Chrome instance at a time.
       // eslint-disable-next-line no-await-in-loop
-      const result = await runLighthouseAudit(url);
+      const result = await runLighthouseAudits(url, settings.lighthouseRuns);
       lighthouse.results.push(result);
       if (result.error) {
         console.log(`Lighthouse error for ${url}: ${result.error}`);
       } else {
-        console.log(`Lighthouse complete for ${url}`);
+        console.log(
+          `Lighthouse complete for ${url} (${result.completedRuns} of ${result.requestedRuns} runs)`,
+        );
       }
     }
     writeJson(path.join(runDir, 'lighthouse.json'), lighthouse);

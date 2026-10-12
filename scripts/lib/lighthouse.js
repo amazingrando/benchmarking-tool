@@ -27,6 +27,48 @@ const failedAudits = (lhr, categoryId) =>
     }))
     .sort((a, b) => a.score - b.score || a.title.localeCompare(b.title));
 
+const metricValue = (audit) =>
+  typeof audit?.numericValue === 'number' ? audit.numericValue : null;
+
+const formatSeconds = (milliseconds) => `${(milliseconds / 1000).toFixed(1)} s`;
+
+const formatCls = (value) => {
+  if (value === 0) return '0';
+  return value.toFixed(3).replace(/0+$/, '').replace(/\.$/, '');
+};
+
+export const formatMetricValue = (name, value) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  if (name === 'cls') return formatCls(value);
+  if (name === 'tbt') return `${Math.round(value)} ms`;
+  return formatSeconds(value);
+};
+
+export const median = (values) => {
+  const sorted = values
+    .filter((value) => typeof value === 'number' && !Number.isNaN(value))
+    .sort((a, b) => a - b);
+  if (!sorted.length) return null;
+  const middle = Math.floor(sorted.length / 2);
+  if (sorted.length % 2 === 1) return sorted[middle];
+  return (sorted[middle - 1] + sorted[middle]) / 2;
+};
+
+const numberRange = (values) => {
+  const numbers = values.filter(
+    (value) => typeof value === 'number' && !Number.isNaN(value),
+  );
+  if (!numbers.length) return { min: null, median: null, max: null };
+  return {
+    min: Math.min(...numbers),
+    median: median(numbers),
+    max: Math.max(...numbers),
+  };
+};
+
+const messageFrom = (error) =>
+  error instanceof Error ? error.message : String(error);
+
 export const summarizeLighthouse = (lhr, url) => {
   const score = (id) => {
     const value = lhr.categories?.[id]?.score;
@@ -45,11 +87,13 @@ export const summarizeLighthouse = (lhr, url) => {
     metrics: Object.fromEntries(
       METRICS.map(([name, auditId]) => {
         const audit = lhr.audits?.[auditId];
+        const value = metricValue(audit);
         return [
           name,
           {
-            display: audit?.displayValue ?? null,
+            display: audit?.displayValue ?? formatMetricValue(name, value),
             score: typeof audit?.score === 'number' ? audit.score : null,
+            value,
           },
         ];
       }),
@@ -64,38 +108,120 @@ export const summarizeLighthouse = (lhr, url) => {
   };
 };
 
-export const runLighthouseAudit = async (url) => {
+const medianRun = (runs) => {
+  const performance = median(runs.map((run) => run.scores?.performance));
+  if (performance === null) return runs[Math.floor(runs.length / 2)];
+
+  return runs.reduce((closest, run) => {
+    const distance = Math.abs(
+      (run.scores?.performance ?? Infinity) - performance,
+    );
+    const closestDistance = Math.abs(
+      (closest.scores?.performance ?? Infinity) - performance,
+    );
+    return distance < closestDistance ? run : closest;
+  });
+};
+
+export const aggregateLighthouseRuns = (
+  runs,
+  { url, requestedRuns, errors },
+) => {
+  const chosen = medianRun(runs);
+  const scoreRange = (key) => numberRange(runs.map((run) => run.scores?.[key]));
+  const metricRange = (name) => {
+    const range = numberRange(runs.map((run) => run.metrics?.[name]?.value));
+    return {
+      min: {
+        value: range.min,
+        display: formatMetricValue(name, range.min),
+      },
+      median: {
+        value: range.median,
+        display: formatMetricValue(name, range.median),
+      },
+      max: {
+        value: range.max,
+        display: formatMetricValue(name, range.max),
+      },
+    };
+  };
+
+  return {
+    url,
+    requestedRuns,
+    completedRuns: runs.length,
+    runErrors: errors,
+    scores: {
+      performance: scoreRange('performance'),
+      accessibility: scoreRange('accessibility'),
+      bestPractices: scoreRange('bestPractices'),
+      seo: scoreRange('seo'),
+    },
+    metrics: Object.fromEntries(
+      METRICS.map(([name]) => [name, metricRange(name)]),
+    ),
+    findings: chosen.findings,
+    error: null,
+  };
+};
+
+const emptyResult = (url, requestedRuns, error) => ({
+  url,
+  requestedRuns,
+  completedRuns: 0,
+  runErrors: error ? [error] : [],
+  scores: null,
+  metrics: null,
+  findings: null,
+  error,
+});
+
+export const runLighthouseAudits = async (url, runCount) => {
+  const count = Number.isInteger(runCount) && runCount >= 1 ? runCount : 6;
   let chrome;
+  const runs = [];
+  const errors = [];
+
   try {
     chrome = await chromeLauncher.launch({
       chromeFlags: ['--headless', '--no-sandbox', '--disable-setuid-sandbox'],
     });
 
-    const result = await lighthouse(url, {
-      logLevel: 'error',
-      output: 'json',
-      onlyCategories: CATEGORIES,
-      port: chrome.port,
-    });
+    for (let index = 0; index < count; index += 1) {
+      console.log(`Lighthouse run ${index + 1} of ${count}: ${url}`);
+      try {
+        // Each pass needs the previous one to finish before Chrome is reused.
+        // eslint-disable-next-line no-await-in-loop
+        const result = await lighthouse(url, {
+          logLevel: 'error',
+          output: 'json',
+          onlyCategories: CATEGORIES,
+          port: chrome.port,
+        });
 
-    if (!result?.lhr) {
-      return {
-        url,
-        scores: null,
-        metrics: null,
-        error: 'Lighthouse returned no result.',
-      };
+        if (!result?.lhr) {
+          errors.push(`Run ${index + 1} returned no result.`);
+        } else {
+          runs.push(summarizeLighthouse(result.lhr, url));
+        }
+      } catch (error) {
+        errors.push(`Run ${index + 1}: ${messageFrom(error)}`);
+      }
     }
-
-    return summarizeLighthouse(result.lhr, url);
   } catch (error) {
-    return {
-      url,
-      scores: null,
-      metrics: null,
-      error: error instanceof Error ? error.message : String(error),
-    };
+    return emptyResult(url, count, messageFrom(error));
   } finally {
     if (chrome) await chrome.kill();
   }
+
+  if (!runs.length) {
+    return emptyResult(
+      url,
+      count,
+      errors.join(' ') || 'Lighthouse returned no result.',
+    );
+  }
+
+  return aggregateLighthouseRuns(runs, { url, requestedRuns: count, errors });
 };

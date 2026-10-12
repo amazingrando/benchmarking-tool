@@ -44,6 +44,9 @@ export const defaultViewports = [
 
 // Optional. Defaults to Chromium, Firefox, and WebKit.
 export const browsers = ['chromium', 'firefox', 'webkit'];
+
+// Optional. How many times to run Lighthouse for each URL. Defaults to 6.
+export const lighthouseRuns = 6;
 ```
 
 Each viewport needs:
@@ -123,7 +126,7 @@ Screenshot files live under `screenshots/{browser}/`:
 * Mobile: `{slug}--{width}-mobile.png`
 * Reflow evidence, only when a page overflows at 320 CSS pixels: `{slug}--320-reflow.png`
 
-`lighthouse.json` holds the desktop Chrome scores, lab metrics, and the failed audits for performance, accessibility, best practices, and SEO. Each failed audit includes its title, score, and the recommendation for what to change.
+`lighthouse.json` holds the desktop Chrome scores, lab metrics, and the failed audits for performance, accessibility, best practices, and SEO. Scores and lab metrics include the minimum, median, and maximum across the configured number of runs. Each failed audit includes its title, score, and the recommendation for what to change. Recommendations come from the run closest to the median performance score.
 
 `a11y.json` holds, per URL and browser:
 

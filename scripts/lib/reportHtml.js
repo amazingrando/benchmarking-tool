@@ -136,9 +136,18 @@ const metricDisplay = (metric) => {
   return metric;
 };
 
+const ratingFromNumber = (value, metricName) => {
+  const bounds = METRIC_BOUNDS[metricName];
+  if (!bounds || typeof value !== 'number' || Number.isNaN(value)) return null;
+  if (value <= bounds.good) return 'good';
+  if (value <= bounds.poor) return 'needs-improvement';
+  return 'poor';
+};
+
 const metricRating = (metric, metricName) => {
   if (metric && typeof metric === 'object') {
     return (
+      ratingFromNumber(metric.value, metricName) ??
       ratingFromAuditScore(metric.score) ??
       ratingFromDisplay(metric.display, metricName)
     );
@@ -229,48 +238,83 @@ const renderLighthouseFindings = (lab) => {
 
   return `<details>
     <summary>${total} Lighthouse finding${total === 1 ? '' : 's'} to act on</summary>
-    <p>These are the desktop Chrome audits that scored below 100, worst first. The title is the change to make, and the text under it explains why.</p>
+    <p>These are the desktop Chrome audits that scored below 100, worst first, from the run closest to the median performance score. The title is the change to make, and the text under it explains why.</p>
     ${sections}
   </details>`;
 };
 
-const renderMetricRow = (result) => {
+const SCORE_KEYS = ['performance', 'accessibility', 'bestPractices', 'seo'];
+const METRIC_KEYS = ['fcp', 'lcp', 'tbt', 'cls', 'speedIndex', 'tti'];
+const STATS = [
+  ['min', 'Minimum'],
+  ['median', 'Median'],
+  ['max', 'Maximum'],
+];
+
+const isSpread = (value) =>
+  Boolean(value) &&
+  typeof value === 'object' &&
+  'min' in value &&
+  'median' in value &&
+  'max' in value;
+
+const spreadOf = (value) =>
+  isSpread(value) ? value : { min: value, median: value, max: value };
+
+const formatScore = (value) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) return null;
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+};
+
+const renderStatCells = (result, stat) => {
+  const scoreCells = SCORE_KEYS.map((key) => {
+    const value = spreadOf(result.scores?.[key])[stat];
+    return renderRatedCell(formatScore(value), categoryRating(value));
+  });
+  const metricCells = METRIC_KEYS.map((name) => {
+    const metric = spreadOf(result.metrics?.[name])[stat];
+    return renderRatedCell(metricDisplay(metric), metricRating(metric, name));
+  });
+  return [...scoreCells, ...metricCells].join('');
+};
+
+const renderResultRows = (page, result) => {
   if (!result) {
-    return '<td colspan="10">No Lighthouse result for this URL.</td>';
+    return `<tr><th scope="row">${escapeHtml(page.url)}</th><td colspan="11">No Lighthouse result for this URL.</td></tr>`;
   }
   if (result.error || !result.scores) {
-    return `<td colspan="10">${escapeHtml(result.error || 'Lighthouse failed.')}</td>`;
+    return `<tr><th scope="row">${escapeHtml(page.url)}</th><td colspan="11">${escapeHtml(result.error || 'Lighthouse failed.')}</td></tr>`;
   }
 
-  const scoreCells = [
-    result.scores.performance,
-    result.scores.accessibility,
-    result.scores.bestPractices,
-    result.scores.seo,
-  ].map((score) => renderRatedCell(score, categoryRating(score)));
+  return STATS.map(([stat, label], index) => {
+    const urlCell =
+      index === 0
+        ? `<th scope="row" rowspan="3">${escapeHtml(page.url)}</th>`
+        : '';
+    return `<tr>${urlCell}<th scope="row">${label}</th>${renderStatCells(result, stat)}</tr>`;
+  }).join('');
+};
 
-  const metricCells = ['fcp', 'lcp', 'tbt', 'cls', 'speedIndex', 'tti'].map(
-    (name) =>
-      renderRatedCell(
-        metricDisplay(result.metrics?.[name]),
-        metricRating(result.metrics?.[name], name),
-      ),
-  );
-
-  return [...scoreCells, ...metricCells].join('');
+const runCountSentence = (lighthouse) => {
+  const requested =
+    lighthouse.runs ??
+    lighthouse.results?.find((result) => result.requestedRuns)?.requestedRuns;
+  if (requested) {
+    const noun = requested === 1 ? 'run' : 'runs';
+    return `These numbers come from ${requested} desktop Chrome ${noun} per URL. Each URL has a minimum, median, and maximum row.`;
+  }
+  return 'These numbers come from one desktop Chrome run per URL. Minimum, median, and maximum match when only one run was saved.';
 };
 
 const renderScores = (lighthouse, pages) => {
   const rows = pages
-    .map((page) => {
-      const result = lighthouseFor(lighthouse, page.url);
-      return `<tr><th scope="row">${escapeHtml(page.url)}</th>${renderMetricRow(result)}</tr>`;
-    })
+    .map((page) => renderResultRows(page, lighthouseFor(lighthouse, page.url)))
     .join('');
 
   return `<section>
     <h2>Lighthouse lab results</h2>
-    <p>These numbers come from one desktop Chrome run per URL. Total Blocking Time is the lab stand-in for Interaction to Next Paint. This report does not include field data.</p>
+    <p>${escapeHtml(runCountSentence(lighthouse))} Total Blocking Time is the lab stand-in for Interaction to Next Paint. This report does not include field data.</p>
     <ul class="rating-legend">
       <li><span class="swatch rating-good">Good</span> Category score 90–100. First Contentful Paint ≤ 1.8 s, Largest Contentful Paint ≤ 2.5 s, Total Blocking Time ≤ 200 ms, Cumulative Layout Shift ≤ 0.1, Speed Index ≤ 3.4 s, Time to Interactive ≤ 3.8 s.</li>
       <li><span class="swatch rating-needs-improvement">Needs improvement</span> Category score 50–89. Lab metrics between the good and poor cutoffs.</li>
@@ -282,6 +326,7 @@ const renderScores = (lighthouse, pages) => {
         <thead>
           <tr>
             <th scope="col">URL</th>
+            <th scope="col">Statistic</th>
             <th scope="col">Performance</th>
             <th scope="col">Accessibility</th>
             <th scope="col">Best practices</th>
@@ -294,7 +339,7 @@ const renderScores = (lighthouse, pages) => {
             <th scope="col">Time to Interactive</th>
           </tr>
         </thead>
-        <tbody>${rows || '<tr><td colspan="11">No URLs were audited.</td></tr>'}</tbody>
+        <tbody>${rows || '<tr><td colspan="12">No URLs were audited.</td></tr>'}</tbody>
       </table>
     </div>
   </section>`;
@@ -476,19 +521,25 @@ const renderPage = (page, lighthouse, screenshotsOnly) => {
           ['SEO', lab.scores.seo],
         ]
           .map(([name, score]) => {
-            const rating = categoryRating(score);
+            const spread = spreadOf(score);
+            const rating = categoryRating(spread.median);
             const label = rating
               ? RATING_LABEL[rating].toLowerCase()
               : 'unrated';
-            return `${name} ${score}, ${label}`;
+            return `${name} median ${formatScore(spread.median) ?? '—'}, ${label} (minimum ${formatScore(spread.min) ?? '—'}, maximum ${formatScore(spread.max) ?? '—'})`;
           })
           .join('. ')
           .concat('.')
+      : '';
+  const partialRuns =
+    lab?.runErrors?.length && !lab.error
+      ? `${lab.completedRuns} of ${lab.requestedRuns} Lighthouse runs completed. ${lab.runErrors.join(' ')}`
       : '';
 
   return `<article>
     <h3>${pageHeading}</h3>
     ${labSummary ? `<p>${escapeHtml(labSummary)}</p>` : ''}
+    ${partialRuns ? `<p>${escapeHtml(partialRuns)}</p>` : ''}
     ${renderLighthouseFindings(lab)}
     ${errors.length ? `<ul>${errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('')}</ul>` : ''}
     <details>
