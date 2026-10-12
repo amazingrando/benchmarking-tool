@@ -26,10 +26,32 @@ const safeUrl = (value) => {
   return '';
 };
 
+const SEVERITY = {
+  critical: 'severe',
+  serious: 'severe',
+  error: 'severe',
+  moderate: 'moderate',
+  warning: 'moderate',
+  minor: 'low',
+  notice: 'low',
+  unknown: 'low',
+};
+
+const SEVERITY_LABEL = {
+  severe: 'Severe',
+  moderate: 'Moderate',
+  low: 'Low',
+};
+
 const impactRank = (impact) => {
   const index = IMPACT_ORDER.indexOf(impact);
   return index === -1 ? IMPACT_ORDER.length : index;
 };
+
+const severityOf = (impact) => SEVERITY[impact] ?? 'low';
+
+const countSeverity = (issues, severity) =>
+  issues.filter((issue) => severityOf(issue.impact) === severity).length;
 
 const groupIssues = (page) => {
   const grouped = new Map();
@@ -59,6 +81,78 @@ const groupIssues = (page) => {
 const lighthouseFor = (lighthouse, url) =>
   lighthouse.results?.find((result) => result.url === url) ?? null;
 
+const RATING_LABEL = {
+  good: 'Good',
+  'needs-improvement': 'Needs improvement',
+  poor: 'Poor',
+};
+
+const METRIC_BOUNDS = {
+  fcp: { good: 1800, poor: 3000 },
+  lcp: { good: 2500, poor: 4000 },
+  tbt: { good: 200, poor: 600 },
+  cls: { good: 0.1, poor: 0.25 },
+  speedIndex: { good: 3400, poor: 5800 },
+  tti: { good: 3800, poor: 7300 },
+};
+
+const categoryRating = (score) => {
+  if (typeof score !== 'number') return null;
+  if (score >= 90) return 'good';
+  if (score >= 50) return 'needs-improvement';
+  return 'poor';
+};
+
+const ratingFromAuditScore = (score) => {
+  if (typeof score !== 'number') return null;
+  if (score >= 0.9) return 'good';
+  if (score >= 0.5) return 'needs-improvement';
+  return 'poor';
+};
+
+const parseMetricValue = (display) => {
+  const text = String(display)
+    .replace(/[\u00a0\u202f\u2009]/g, ' ')
+    .trim();
+  const match = text.match(/^(-?[\d.]+)\s*(ms|s)?$/i);
+  if (!match) return null;
+  const amount = Number(match[1]);
+  if (Number.isNaN(amount)) return null;
+  if (match[2]?.toLowerCase() === 's') return amount * 1000;
+  return amount;
+};
+
+const ratingFromDisplay = (display, metricName) => {
+  const bounds = METRIC_BOUNDS[metricName];
+  const value = parseMetricValue(display);
+  if (!bounds || value === null) return null;
+  if (value <= bounds.good) return 'good';
+  if (value <= bounds.poor) return 'needs-improvement';
+  return 'poor';
+};
+
+const metricDisplay = (metric) => {
+  if (metric && typeof metric === 'object') return metric.display;
+  return metric;
+};
+
+const metricRating = (metric, metricName) => {
+  if (metric && typeof metric === 'object') {
+    return (
+      ratingFromAuditScore(metric.score) ??
+      ratingFromDisplay(metric.display, metricName)
+    );
+  }
+  return ratingFromDisplay(metric, metricName);
+};
+
+const renderRatedCell = (text, rating) => {
+  if (text === null || text === undefined || text === '') return '<td>—</td>';
+  const shown = escapeHtml(text);
+  if (!rating) return `<td>${shown}</td>`;
+  return `<td class="rating-${rating}">${shown}, ${RATING_LABEL[rating]}</td>`;
+};
+
 const renderMetricRow = (result) => {
   if (!result) {
     return '<td colspan="10">No Lighthouse result for this URL.</td>';
@@ -67,20 +161,22 @@ const renderMetricRow = (result) => {
     return `<td colspan="10">${escapeHtml(result.error || 'Lighthouse failed.')}</td>`;
   }
 
-  const cells = [
+  const scoreCells = [
     result.scores.performance,
     result.scores.accessibility,
     result.scores.bestPractices,
     result.scores.seo,
-    result.metrics?.fcp,
-    result.metrics?.lcp,
-    result.metrics?.tbt,
-    result.metrics?.cls,
-    result.metrics?.speedIndex,
-    result.metrics?.tti,
-  ];
+  ].map((score) => renderRatedCell(score, categoryRating(score)));
 
-  return cells.map((cell) => `<td>${escapeHtml(cell ?? '—')}</td>`).join('');
+  const metricCells = ['fcp', 'lcp', 'tbt', 'cls', 'speedIndex', 'tti'].map(
+    (name) =>
+      renderRatedCell(
+        metricDisplay(result.metrics?.[name]),
+        metricRating(result.metrics?.[name], name),
+      ),
+  );
+
+  return [...scoreCells, ...metricCells].join('');
 };
 
 const renderScores = (lighthouse, pages) => {
@@ -94,6 +190,11 @@ const renderScores = (lighthouse, pages) => {
   return `<section>
     <h2>Lighthouse lab results</h2>
     <p>These numbers come from one desktop Chrome run per URL. Total Blocking Time is the lab stand-in for Interaction to Next Paint. This report does not include field data.</p>
+    <ul class="rating-legend">
+      <li><span class="swatch rating-good">Good</span> Category score 90–100. First Contentful Paint ≤ 1.8 s, Largest Contentful Paint ≤ 2.5 s, Total Blocking Time ≤ 200 ms, Cumulative Layout Shift ≤ 0.1, Speed Index ≤ 3.4 s, Time to Interactive ≤ 3.8 s.</li>
+      <li><span class="swatch rating-needs-improvement">Needs improvement</span> Category score 50–89. Lab metrics between the good and poor cutoffs.</li>
+      <li><span class="swatch rating-poor">Poor</span> Category score 0–49. First Contentful Paint &gt; 3 s, Largest Contentful Paint &gt; 4 s, Total Blocking Time &gt; 600 ms, Cumulative Layout Shift &gt; 0.25, Speed Index &gt; 5.8 s, Time to Interactive &gt; 7.3 s.</li>
+    </ul>
     <div class="table-scroll" tabindex="0">
       <table>
         <caption>Lighthouse category scores and lab Core Web Vitals</caption>
@@ -130,9 +231,10 @@ const renderIssueTable = (issues) => {
         ? ` <a href="${escapeHtml(help)}">Rule help</a>`
         : '';
       const tags = (issue.tags ?? []).join(', ');
-      return `<tr>
+      const severity = severityOf(issue.impact);
+      return `<tr class="severity-${severity}">
         <td>${escapeHtml(issue.browsers.join(', '))}</td>
-        <td>${escapeHtml(issue.impact)}</td>
+        <td class="severity">${escapeHtml(SEVERITY_LABEL[severity])}, ${escapeHtml(issue.impact)}</td>
         <td>${escapeHtml(issue.source)}</td>
         <td><code>${escapeHtml(issue.id)}</code></td>
         <td>${escapeHtml(issue.message)}${helpLink}</td>
@@ -142,13 +244,18 @@ const renderIssueTable = (issues) => {
     })
     .join('');
 
-  return `<div class="table-scroll" tabindex="0">
+  return `<ul class="severity-legend">
+    <li><span class="swatch severity-severe">Severe</span> axe critical and serious, HTML_CodeSniffer errors</li>
+    <li><span class="swatch severity-moderate">Moderate</span> axe moderate, HTML_CodeSniffer warnings</li>
+    <li><span class="swatch severity-low">Low</span> axe minor, HTML_CodeSniffer notices</li>
+  </ul>
+  <div class="table-scroll" tabindex="0">
     <table>
-      <caption>Issues grouped by rule, selector, and message. The browser column lists every engine that reported that row.</caption>
+      <caption>Issues sorted with severe first, then moderate, then low. The browser column lists every engine that reported that row.</caption>
       <thead>
         <tr>
           <th scope="col">Browsers</th>
-          <th scope="col">Impact</th>
+          <th scope="col">Severity</th>
           <th scope="col">Source</th>
           <th scope="col">Rule</th>
           <th scope="col">Message</th>
@@ -281,7 +388,21 @@ const renderPage = (page, lighthouse, screenshotsOnly) => {
   const lab = lighthouseFor(lighthouse, page.url);
   const labSummary =
     lab?.scores && !lab.error
-      ? `Performance ${lab.scores.performance}, accessibility ${lab.scores.accessibility}, best practices ${lab.scores.bestPractices}, SEO ${lab.scores.seo}.`
+      ? [
+          ['Performance', lab.scores.performance],
+          ['Accessibility', lab.scores.accessibility],
+          ['Best practices', lab.scores.bestPractices],
+          ['SEO', lab.scores.seo],
+        ]
+          .map(([name, score]) => {
+            const rating = categoryRating(score);
+            const label = rating
+              ? RATING_LABEL[rating].toLowerCase()
+              : 'unrated';
+            return `${name} ${score}, ${label}`;
+          })
+          .join('. ')
+          .concat('.')
       : '';
 
   return `<article>
@@ -289,7 +410,7 @@ const renderPage = (page, lighthouse, screenshotsOnly) => {
     ${labSummary ? `<p>${escapeHtml(labSummary)}</p>` : ''}
     ${errors.length ? `<ul>${errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('')}</ul>` : ''}
     <details>
-      <summary>${issues.length} engine issue${issues.length === 1 ? '' : 's'}, ${noteCount} keyboard note${noteCount === 1 ? '' : 's'}</summary>
+      <summary>${countSeverity(issues, 'severe')} severe, ${countSeverity(issues, 'moderate')} moderate, ${countSeverity(issues, 'low')} low, ${noteCount} keyboard note${noteCount === 1 ? '' : 's'}</summary>
       <h4>Issues</h4>
       ${screenshotsOnly ? '<p>This run collected screenshots only.</p>' : renderIssueTable(issues)}
       <h4>Structure, keyboard, reflow, and reduced motion</h4>
@@ -339,6 +460,30 @@ export const renderReport = ({ lighthouse, a11y }) => {
     th { background: #e7e2d8; }
     article { margin: 0 0 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #c8c4bc; }
     summary { font-weight: 600; cursor: pointer; }
+    .severity-legend { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem 1.25rem; }
+    .swatch { display: inline-block; padding: 0.1rem 0.45rem; border-left: 4px solid transparent; font-weight: 600; }
+    .swatch.severity-severe { border-left-color: #9b1c1c; }
+    .swatch.severity-moderate { border-left-color: #8a6a00; }
+    .swatch.severity-low { border-left-color: #6f6a62; }
+    tr.severity-severe td:first-child { box-shadow: inset 4px 0 0 #9b1c1c; }
+    tr.severity-moderate td:first-child { box-shadow: inset 4px 0 0 #8a6a00; }
+    tr.severity-low td:first-child { box-shadow: inset 4px 0 0 #6f6a62; }
+    .severity-severe { background: #f4d6d6; color: #6b1212; }
+    .severity-moderate { background: #ffe8a3; color: #5c3b00; }
+    .severity-low { background: #eeeae4; color: #3f3c36; }
+    .severity-severe a, .severity-moderate a, .severity-low a { color: #0b3a82; }
+    td.severity { font-weight: 600; }
+    .rating-legend { list-style: none; padding: 0; margin: 0 0 1rem; }
+    .rating-legend li { margin: 0.35rem 0; }
+    .rating-good { background: #d8f3dc; color: #0d4f1a; }
+    .rating-needs-improvement { background: #ffe8a3; color: #5c3b00; }
+    .rating-poor { background: #f4d6d6; color: #6b1212; }
+    td.rating-good { box-shadow: inset 4px 0 0 #137333; font-weight: 600; }
+    td.rating-needs-improvement { box-shadow: inset 4px 0 0 #8a6a00; font-weight: 600; }
+    td.rating-poor { box-shadow: inset 4px 0 0 #9b1c1c; font-weight: 600; }
+    .swatch.rating-good { border-left-color: #137333; }
+    .swatch.rating-needs-improvement { border-left-color: #8a6a00; }
+    .swatch.rating-poor { border-left-color: #9b1c1c; }
     figure { margin: 1rem 0; }
     img { max-width: 100%; height: auto; border: 1px solid #c8c4bc; background: #fff; }
     figcaption { font-size: 0.9rem; }

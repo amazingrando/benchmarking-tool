@@ -28,10 +28,16 @@ export const summarizeLighthouse = (lhr, url) => {
       seo: score('seo'),
     },
     metrics: Object.fromEntries(
-      METRICS.map(([name, auditId]) => [
-        name,
-        lhr.audits?.[auditId]?.displayValue ?? null,
-      ]),
+      METRICS.map(([name, auditId]) => {
+        const audit = lhr.audits?.[auditId];
+        return [
+          name,
+          {
+            display: audit?.displayValue ?? null,
+            score: typeof audit?.score === 'number' ? audit.score : null,
+          },
+        ];
+      }),
     ),
     error: null,
   };

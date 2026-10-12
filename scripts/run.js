@@ -1,4 +1,6 @@
+import { execFileSync } from 'child_process';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { chromium, firefox, webkit } from 'playwright';
 import { auditUrl } from './lib/browserPass.js';
@@ -9,6 +11,37 @@ import { createRunDir, latestRunDir } from './lib/runDir.js';
 import { loadSettings } from './lib/settings.js';
 
 const launchers = { chromium, firefox, webkit };
+
+const launchOptions = (browserName) => {
+  if (browserName !== 'firefox') return { options: {} };
+  // macOS 27 blocks this Firefox from ~/Library/Application Support/Firefox.
+  const home = fs.mkdtempSync(
+    path.join(os.tmpdir(), 'benchmark-firefox-home-'),
+  );
+  return {
+    home,
+    options: { env: { ...process.env, CFFIXED_USER_HOME: home } },
+  };
+};
+
+const removeFirefoxHome = (home) => {
+  if (!home) return;
+  try {
+    execFileSync('chmod', ['-R', '-N', home], { stdio: 'ignore' });
+  } catch {
+    // chmod -N clears the macOS "deny delete" flag Firefox sets. Other systems skip it.
+  }
+  try {
+    fs.rmSync(home, {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 200,
+    });
+  } catch (error) {
+    console.log(`Could not remove Firefox home ${home}: ${error.message}`);
+  }
+};
 
 const readJson = (file) => JSON.parse(fs.readFileSync(file, 'utf8'));
 
@@ -96,10 +129,12 @@ const main = async () => {
   for (const browserName of settings.browsers) {
     console.log(`Launching ${browserName}`);
     let browser;
+    const { home: firefoxHome, options } = launchOptions(browserName);
     try {
       // eslint-disable-next-line no-await-in-loop
-      browser = await launchers[browserName].launch();
+      browser = await launchers[browserName].launch(options);
     } catch (error) {
+      removeFirefoxHome(firefoxHome);
       const message = error instanceof Error ? error.message : String(error);
       console.log(`Could not launch ${browserName}: ${message}`);
       for (const page of pages) {
@@ -140,6 +175,7 @@ const main = async () => {
       }
     } finally {
       await browser.close();
+      removeFirefoxHome(firefoxHome);
     }
   }
 
