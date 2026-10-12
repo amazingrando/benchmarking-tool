@@ -12,6 +12,21 @@ const METRICS = [
   ['tti', 'interactive'],
 ];
 
+const failedAudits = (lhr, categoryId) =>
+  (lhr.categories?.[categoryId]?.auditRefs ?? [])
+    .map((ref) => lhr.audits?.[ref.id])
+    .filter(
+      (audit) => audit && typeof audit.score === 'number' && audit.score < 1,
+    )
+    .map((audit) => ({
+      id: audit.id,
+      title: audit.title,
+      description: audit.description ?? '',
+      displayValue: audit.displayValue ?? null,
+      score: Math.round(audit.score * 100),
+    }))
+    .sort((a, b) => a.score - b.score || a.title.localeCompare(b.title));
+
 export const summarizeLighthouse = (lhr, url) => {
   const score = (id) => {
     const value = lhr.categories?.[id]?.score;
@@ -38,6 +53,12 @@ export const summarizeLighthouse = (lhr, url) => {
           },
         ];
       }),
+    ),
+    findings: Object.fromEntries(
+      CATEGORIES.map((categoryId) => [
+        categoryId,
+        failedAudits(lhr, categoryId),
+      ]),
     ),
     error: null,
   };

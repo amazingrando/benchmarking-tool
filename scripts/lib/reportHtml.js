@@ -153,6 +153,87 @@ const renderRatedCell = (text, rating) => {
   return `<td class="rating-${rating}">${shown}, ${RATING_LABEL[rating]}</td>`;
 };
 
+const LIGHTHOUSE_CATEGORIES = [
+  ['performance', 'Performance'],
+  ['accessibility', 'Accessibility'],
+  ['best-practices', 'Best practices'],
+  ['seo', 'SEO'],
+];
+
+const renderLighthouseText = (markdown) => {
+  const source = String(markdown ?? '');
+  const pattern = /\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|`([^`]+)`/g;
+  const parts = [];
+  let last = 0;
+
+  for (const match of source.matchAll(pattern)) {
+    parts.push(escapeHtml(source.slice(last, match.index)));
+    if (match[3] != null) {
+      parts.push(`<code>${escapeHtml(match[3])}</code>`);
+    } else {
+      const href = safeUrl(match[2]);
+      parts.push(
+        href
+          ? `<a href="${escapeHtml(href)}">${escapeHtml(match[1])}</a>`
+          : escapeHtml(match[0]),
+      );
+    }
+    last = match.index + match[0].length;
+  }
+
+  parts.push(escapeHtml(source.slice(last)));
+  return parts.join('');
+};
+
+const renderFinding = (finding) => {
+  const rating = categoryRating(finding.score);
+  const ratingClass = rating ? ` class="finding-score rating-${rating}"` : '';
+  const ratingText = rating ? `, ${RATING_LABEL[rating]}` : '';
+  const savings = finding.displayValue
+    ? ` <span class="finding-savings">${escapeHtml(finding.displayValue)}</span>`
+    : '';
+
+  return `<li>
+    <p><strong>${renderLighthouseText(finding.title)}</strong>${savings}</p>
+    <p${ratingClass}>Score ${escapeHtml(finding.score)}${ratingText}</p>
+    <p>${renderLighthouseText(finding.description)}</p>
+  </li>`;
+};
+
+const renderLighthouseFindings = (lab) => {
+  if (!lab || lab.error) return '';
+  if (!lab.findings) {
+    return `<details>
+      <summary>Lighthouse findings</summary>
+      <p>This run did not save Lighthouse recommendations. Run the audit again to collect them.</p>
+    </details>`;
+  }
+
+  const groups = LIGHTHOUSE_CATEGORIES.map(([id, label]) => ({
+    label,
+    items: lab.findings[id] ?? [],
+  }));
+  const total = groups.reduce((count, group) => count + group.items.length, 0);
+  const sections = groups
+    .map(
+      (group) => `<section>
+        <h4>${escapeHtml(group.label)}</h4>
+        ${
+          group.items.length
+            ? `<ol class="findings">${group.items.map((item) => renderFinding(item)).join('')}</ol>`
+            : '<p>Nothing failed in this category.</p>'
+        }
+      </section>`,
+    )
+    .join('');
+
+  return `<details>
+    <summary>${total} Lighthouse finding${total === 1 ? '' : 's'} to act on</summary>
+    <p>These are the desktop Chrome audits that scored below 100, worst first. The title is the change to make, and the text under it explains why.</p>
+    ${sections}
+  </details>`;
+};
+
 const renderMetricRow = (result) => {
   if (!result) {
     return '<td colspan="10">No Lighthouse result for this URL.</td>';
@@ -408,6 +489,7 @@ const renderPage = (page, lighthouse, screenshotsOnly) => {
   return `<article>
     <h3>${pageHeading}</h3>
     ${labSummary ? `<p>${escapeHtml(labSummary)}</p>` : ''}
+    ${renderLighthouseFindings(lab)}
     ${errors.length ? `<ul>${errors.map((error) => `<li>${escapeHtml(error)}</li>`).join('')}</ul>` : ''}
     <details>
       <summary>${countSeverity(issues, 'severe')} severe, ${countSeverity(issues, 'moderate')} moderate, ${countSeverity(issues, 'low')} low, ${noteCount} keyboard note${noteCount === 1 ? '' : 's'}</summary>
@@ -484,6 +566,10 @@ export const renderReport = ({ lighthouse, a11y }) => {
     .swatch.rating-good { border-left-color: #137333; }
     .swatch.rating-needs-improvement { border-left-color: #8a6a00; }
     .swatch.rating-poor { border-left-color: #9b1c1c; }
+    ol.findings { padding-left: 1.25rem; }
+    ol.findings li { margin: 0 0 1rem; }
+    .finding-savings { font-weight: 600; }
+    .finding-score { display: inline-block; padding: 0.1rem 0.45rem; font-weight: 600; }
     figure { margin: 1rem 0; }
     img { max-width: 100%; height: auto; border: 1px solid #c8c4bc; background: #fff; }
     figcaption { font-size: 0.9rem; }

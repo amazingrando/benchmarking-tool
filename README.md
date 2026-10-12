@@ -123,7 +123,7 @@ Screenshot files live under `screenshots/{browser}/`:
 * Mobile: `{slug}--{width}-mobile.png`
 * Reflow evidence, only when a page overflows at 320 CSS pixels: `{slug}--320-reflow.png`
 
-`lighthouse.json` holds the desktop Chrome scores and lab metrics: First Contentful Paint, Largest Contentful Paint, Total Blocking Time, Cumulative Layout Shift, Speed Index, and Time to Interactive.
+`lighthouse.json` holds the desktop Chrome scores, lab metrics, and the failed audits for performance, accessibility, best practices, and SEO. Each failed audit includes its title, score, and the recommendation for what to change.
 
 `a11y.json` holds, per URL and browser:
 
