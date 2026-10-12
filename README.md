@@ -26,7 +26,11 @@ You must have the [Google Chrome app](https://www.google.com/chrome/index.html) 
 
 ### Configuration
 
-Edit `config.js` or generate it from a CSV file of URLs.
+`config.js` is local and is not committed. Copy the example, then edit it or generate it from a CSV file of URLs.
+
+```bash
+cp config.example.js config.js
+```
 
 #### Manual configuration
 

@@ -1,4 +1,15 @@
-import * as config from '../../config.js';
+import fs from 'fs';
+
+const configPath = new URL('../../config.js', import.meta.url);
+
+if (!fs.existsSync(configPath)) {
+  console.error(
+    'Missing config.js. Copy config.example.js to config.js and edit the site list.',
+  );
+  process.exit(1);
+}
+
+const config = await import(configPath.href);
 
 export const DEFAULT_BROWSERS = ['chromium', 'firefox', 'webkit'];
 

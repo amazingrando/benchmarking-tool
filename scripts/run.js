@@ -96,7 +96,9 @@ const main = async () => {
   }
 
   if (!settings.sites.length) {
-    console.error('No sites in config.js.');
+    console.error(
+      'No sites in config.js. Add URLs or run npm run config to generate them.',
+    );
     process.exit(1);
   }
 
